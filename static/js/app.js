@@ -48,7 +48,7 @@
   const analyzeAnotherBtn = el("analyze-another-btn");
 
   let selectedFile = null;
-  const SCORE_RING_CIRCUMFERENCE = 339.3;
+  const SCORE_RING_CIRCUMFERENCE = 370.7;
 
   // -----------------------------------------------------------------------
   // Helpers

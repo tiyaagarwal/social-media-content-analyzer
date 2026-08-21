@@ -14,7 +14,14 @@
 
 <header class="topbar">
   <div class="topbar__inner">
-    <span class="wordmark">CONTENT<span class="wordmark__accent">/</span>ANALYZER</span>
+    <span class="wordmark">
+      <span class="wordmark__icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" fill="currentColor"/>
+        </svg>
+      </span>
+      Content Analyzer
+    </span>
     <span class="topbar__tag">editorial review for social drafts</span>
   </div>
 </header>
@@ -23,20 +30,20 @@
 
   <!-- ============ HERO + UPLOAD ============ -->
   <section class="hero" id="upload-section">
-    <div class="hero__intro">
-      <p class="eyebrow">01 — Submit a draft</p>
-      <h1 class="hero__headline">Turn any post into one that performs.</h1>
-      <p class="hero__sub">Drop in a PDF or a screenshot of your caption. We'll pull the text out, mark it up like an editor, and hand back a version built to hold attention.</p>
-    </div>
+    <span class="hero__badge">AI-assisted engagement review</span>
+    <h1 class="hero__headline">Turn any post into <span class="gradient-text">one that performs.</span></h1>
+    <p class="hero__sub">Drop in a PDF or a screenshot of your caption. We'll pull the text out, mark it up like an editor, and hand back a version built to hold attention.</p>
 
     <div class="upload-card">
       <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload a PDF or image file">
         <input type="file" id="file-input" class="visually-hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tiff" />
         <div class="dropzone__content" id="dropzone-idle">
-          <svg class="dropzone__icon" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-            <path d="M20 5v20M20 5l-7 7M20 5l7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M6 27v4a3 3 0 0 0 3 3h22a3 3 0 0 0 3-3v-4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <span class="dropzone__icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3v13M12 3l-4.5 4.5M12 3l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
           <p class="dropzone__title">Drag a file here, or <span class="link-style">browse</span></p>
           <p class="dropzone__meta">PDF, PNG, JPG, JPEG, WEBP, or TIFF · up to 15 MB</p>
         </div>
@@ -107,9 +114,15 @@
 
     <div class="results-top">
       <div class="score-card">
-        <svg class="score-ring" width="128" height="128" viewBox="0 0 128 128" aria-hidden="true">
-          <circle cx="64" cy="64" r="54" class="score-ring__track" />
-          <circle cx="64" cy="64" r="54" class="score-ring__fill" id="score-ring-fill" />
+        <svg class="score-ring" width="136" height="136" viewBox="0 0 136 136" aria-hidden="true">
+          <defs>
+            <linearGradient id="score-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#5B4BF8"/>
+              <stop offset="100%" stop-color="#7C3AED"/>
+            </linearGradient>
+          </defs>
+          <circle cx="68" cy="68" r="59" class="score-ring__track" />
+          <circle cx="68" cy="68" r="59" class="score-ring__fill" id="score-ring-fill" />
         </svg>
         <div class="score-card__number" id="score-number">—</div>
         <p class="score-card__label">engagement score</p>
