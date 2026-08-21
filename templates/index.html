@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Content Analyzer — turn a draft into a post that performs</title>
+<meta name="description" content="Upload a PDF or screenshot of your social media draft and get an editorial-style breakdown: engagement score, tone, readability, and a rewritten version." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__inner">
+    <span class="wordmark">CONTENT<span class="wordmark__accent">/</span>ANALYZER</span>
+    <span class="topbar__tag">editorial review for social drafts</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ HERO + UPLOAD ============ -->
+  <section class="hero" id="upload-section">
+    <div class="hero__intro">
+      <p class="eyebrow">01 — Submit a draft</p>
+      <h1 class="hero__headline">Turn any post into one that performs.</h1>
+      <p class="hero__sub">Drop in a PDF or a screenshot of your caption. We'll pull the text out, mark it up like an editor, and hand back a version built to hold attention.</p>
+    </div>
+
+    <div class="upload-card">
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload a PDF or image file">
+        <input type="file" id="file-input" class="visually-hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tiff" />
+        <div class="dropzone__content" id="dropzone-idle">
+          <svg class="dropzone__icon" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <path d="M20 5v20M20 5l-7 7M20 5l7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 27v4a3 3 0 0 0 3 3h22a3 3 0 0 0 3-3v-4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="dropzone__title">Drag a file here, or <span class="link-style">browse</span></p>
+          <p class="dropzone__meta">PDF, PNG, JPG, JPEG, WEBP, or TIFF · up to 15 MB</p>
+        </div>
+
+        <div class="dropzone__content dropzone__content--file" id="dropzone-file" hidden>
+          <svg class="dropzone__icon dropzone__icon--file" width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M14 2v6h6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+          <div class="dropzone__filemeta">
+            <p class="dropzone__filename" id="file-name">filename.pdf</p>
+            <p class="dropzone__filesize" id="file-size">0 KB</p>
+          </div>
+          <button type="button" class="btn btn--ghost btn--small" id="change-file-btn">Change file</button>
+        </div>
+      </div>
+
+      <div class="upload-card__error" id="upload-error" hidden role="alert"></div>
+
+      <div class="upload-card__actions">
+        <button type="button" class="btn btn--primary" id="extract-btn" disabled>Extract text</button>
+        <p class="upload-card__hint" id="ai-mode-hint"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PROCESSING ============ -->
+  <section class="status-section" id="processing-section" hidden aria-live="polite">
+    <div class="status-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="status-card__text" id="processing-text">Reading your file…</p>
+    </div>
+  </section>
+
+  <!-- ============ EXTRACTED TEXT ============ -->
+  <section class="extract-section" id="extract-section" hidden>
+    <p class="eyebrow">02 — Extracted text</p>
+    <div class="manuscript">
+      <div class="manuscript__meta" id="extract-meta"></div>
+      <div class="manuscript__warning" id="extract-warning" hidden></div>
+      <textarea class="manuscript__text" id="extracted-text" spellcheck="false"></textarea>
+    </div>
+    <div class="extract-section__actions">
+      <button type="button" class="btn btn--primary" id="analyze-btn">Analyze this content</button>
+      <button type="button" class="btn btn--ghost" id="start-over-btn">Start over</button>
+    </div>
+  </section>
+
+  <!-- ============ ANALYSIS LOADING ============ -->
+  <section class="status-section" id="analyzing-section" hidden aria-live="polite">
+    <div class="status-card">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="status-card__text">Scoring engagement fundamentals…</p>
+    </div>
+  </section>
+
+  <!-- ============ ANALYSIS ERROR ============ -->
+  <section class="status-section" id="analysis-error-section" hidden>
+    <div class="status-card status-card--error">
+      <p class="status-card__text" id="analysis-error-text">Something went wrong.</p>
+      <button type="button" class="btn btn--ghost btn--small" id="retry-analyze-btn">Try again</button>
+    </div>
+  </section>
+
+  <!-- ============ ANALYSIS RESULTS ============ -->
+  <section class="results-section" id="results-section" hidden>
+    <p class="eyebrow">03 — Editorial notes</p>
+
+    <div class="results-top">
+      <div class="score-card">
+        <svg class="score-ring" width="128" height="128" viewBox="0 0 128 128" aria-hidden="true">
+          <circle cx="64" cy="64" r="54" class="score-ring__track" />
+          <circle cx="64" cy="64" r="54" class="score-ring__fill" id="score-ring-fill" />
+        </svg>
+        <div class="score-card__number" id="score-number">—</div>
+        <p class="score-card__label">engagement score</p>
+      </div>
+      <div class="results-top__meta">
+        <p class="results-top__summary" id="results-summary">—</p>
+        <div class="chip-row">
+          <span class="chip" id="tone-chip">Tone —</span>
+          <span class="chip" id="readability-chip">Readability —</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes-grid">
+      <div class="note-card note-card--good">
+        <p class="note-card__tag">Strengths</p>
+        <ul class="note-card__list" id="strengths-list"></ul>
+      </div>
+      <div class="note-card note-card--fix">
+        <p class="note-card__tag">Worth fixing</p>
+        <ul class="note-card__list" id="improvements-list"></ul>
+      </div>
+    </div>
+
+    <div class="rewrite-card">
+      <div class="rewrite-card__header">
+        <p class="note-card__tag">Suggested rewrite</p>
+        <button type="button" class="btn btn--ghost btn--small" id="copy-rewrite-btn">Copy</button>
+      </div>
+      <pre class="rewrite-card__text" id="rewrite-text"></pre>
+    </div>
+
+    <div class="notes-grid notes-grid--three">
+      <div class="note-card">
+        <p class="note-card__tag">Alt hooks</p>
+        <ul class="note-card__list note-card__list--plain" id="hooks-list"></ul>
+      </div>
+      <div class="note-card">
+        <p class="note-card__tag">Suggested CTA</p>
+        <ul class="note-card__list note-card__list--plain" id="cta-list"></ul>
+      </div>
+      <div class="note-card">
+        <p class="note-card__tag">Hashtags</p>
+        <div class="chip-row chip-row--wrap" id="hashtags-list"></div>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn--ghost" id="analyze-another-btn">Analyze another draft</button>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>Content Analyzer — extraction runs locally via OCR/PDF parsing; analysis falls back to a rule-based engine when no AI key is configured.</p>
+</footer>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
