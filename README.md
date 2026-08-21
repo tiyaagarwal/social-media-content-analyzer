@@ -1,5 +1,7 @@
 # Content Analyzer
 
+**Live app:** https://social-media-content-analyzer.onrender.com
+
 A web app that takes a PDF or a screenshot of a social media draft, extracts the text, and returns an editorial-style breakdown of how it'll perform: an engagement score, tone, readability, concrete strengths and fixes, a rewritten version, alternative hooks, CTA suggestions, and hashtags.
 
 Upload → Extracting → Extracted text preview → Analyze → Editorial notes.
