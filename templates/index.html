@@ -22,7 +22,18 @@
       </span>
       Content Analyzer
     </span>
-    <span class="topbar__tag">editorial review for social drafts</span>
+    <div class="topbar__actions">
+      <button type="button" class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle dark/light mode">
+        <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+        <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+        </svg>
+      </button>
+      <span class="topbar__tag">editorial review for social drafts</span>
+    </div>
   </div>
 </header>
 
@@ -85,7 +96,24 @@
       <div class="manuscript__meta" id="extract-meta"></div>
       <div class="manuscript__warning" id="extract-warning" hidden></div>
       <textarea class="manuscript__text" id="extracted-text" spellcheck="false"></textarea>
+      <div class="manuscript__footer">
+        <span class="manuscript__stat" id="char-count-badge">0 characters</span>
+        <span class="manuscript__stat" id="word-count-badge">0 words</span>
+      </div>
     </div>
+
+    <div class="tone-card">
+      <p class="note-card__tag">Target Rewrite Tone</p>
+      <div class="tone-options" id="tone-options">
+        <button type="button" class="tone-btn active" data-tone="">Auto (AI Default)</button>
+        <button type="button" class="tone-btn" data-tone="professional">👔 Professional</button>
+        <button type="button" class="tone-btn" data-tone="witty">💡 Witty</button>
+        <button type="button" class="tone-btn" data-tone="educational">📖 Educational</button>
+        <button type="button" class="tone-btn" data-tone="hype">🚀 Hype</button>
+        <button type="button" class="tone-btn" data-tone="short">⚡ Punchy</button>
+      </div>
+    </div>
+
     <div class="extract-section__actions">
       <button type="button" class="btn btn--primary" id="analyze-btn">Analyze this content</button>
       <button type="button" class="btn btn--ghost" id="start-over-btn">Start over</button>
@@ -149,10 +177,124 @@
 
     <div class="rewrite-card">
       <div class="rewrite-card__header">
-        <p class="note-card__tag">Suggested rewrite</p>
+        <div class="preview-tabs">
+          <button type="button" class="preview-tab active" data-target="rewrite-edit-panel">✏️ Edit Text</button>
+          <button type="button" class="preview-tab" data-target="linkedin-preview-panel">💼 LinkedIn</button>
+          <button type="button" class="preview-tab" data-target="twitter-preview-panel">🐦 X (Twitter)</button>
+          <button type="button" class="preview-tab" data-target="instagram-preview-panel">📸 Instagram</button>
+        </div>
         <button type="button" class="btn btn--ghost btn--small" id="copy-rewrite-btn">Copy</button>
       </div>
-      <pre class="rewrite-card__text" id="rewrite-text"></pre>
+
+      <!-- Tab Content Panels -->
+      <div class="tab-panels">
+        
+        <!-- Editable Text Panel -->
+        <div class="tab-panel active" id="rewrite-edit-panel">
+          <textarea class="rewrite-card__textarea" id="rewrite-text" spellcheck="false" aria-label="Suggested rewrite edit field"></textarea>
+          <div class="rewrite-card__footer">
+            <span class="rewrite-card__stat" id="rewrite-char-count">0 characters</span>
+            <span class="rewrite-card__stat" id="rewrite-word-count">0 words</span>
+          </div>
+        </div>
+
+        <!-- LinkedIn Preview Panel -->
+        <div class="tab-panel" id="linkedin-preview-panel">
+          <div class="linkedin-preview mockup-container">
+            <div class="mockup-header">
+              <div class="mockup-avatar-wrap">
+                <div class="mockup-avatar">UA</div>
+              </div>
+              <div class="mockup-user-info">
+                <div class="mockup-name-row">
+                  <span class="mockup-name">You (Preview)</span>
+                  <span class="mockup-badge">1st</span>
+                </div>
+                <span class="mockup-headline">Creator & Content Strategist</span>
+                <span class="mockup-time">1h • Edited • 🌐</span>
+              </div>
+            </div>
+            <div class="mockup-body" id="linkedin-preview-body"></div>
+            <div class="mockup-image-container" id="linkedin-image-container" style="display: none;">
+              <img class="mockup-image" id="linkedin-preview-img" src="" alt="Uploaded media preview" />
+            </div>
+            <div class="mockup-actions linkedin-actions">
+              <span>👍 Like</span>
+              <span>💬 Comment</span>
+              <span>🔁 Repost</span>
+              <span>Send</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- X/Twitter Preview Panel -->
+        <div class="tab-panel" id="twitter-preview-panel">
+          <div class="twitter-preview mockup-container">
+            <div class="mockup-header">
+              <div class="mockup-avatar-wrap">
+                <div class="mockup-avatar">UA</div>
+              </div>
+              <div class="mockup-user-info">
+                <div class="mockup-name-row">
+                  <span class="mockup-name">You (Preview)</span>
+                  <span class="mockup-verified-badge">⚡</span>
+                  <span class="mockup-handle">@username • 1h</span>
+                </div>
+              </div>
+            </div>
+            <div class="mockup-body" id="twitter-preview-body"></div>
+            <div class="mockup-image-container" id="twitter-image-container" style="display: none;">
+              <img class="mockup-image" id="twitter-preview-img" src="" alt="Uploaded media preview" />
+            </div>
+            <div class="mockup-actions twitter-actions">
+              <span>💬 1.2K</span>
+              <span>🔁 840</span>
+              <span>❤️ 12.4K</span>
+              <span>📤</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instagram Preview Panel -->
+        <div class="tab-panel" id="instagram-preview-panel">
+          <div class="instagram-preview mockup-container">
+            <div class="mockup-header">
+              <div class="mockup-avatar-wrap">
+                <div class="mockup-avatar">UA</div>
+              </div>
+              <div class="mockup-user-info">
+                <span class="mockup-name">your_handle</span>
+                <span class="mockup-location">Original Audio</span>
+              </div>
+              <span class="mockup-more">•••</span>
+            </div>
+            
+            <div class="instagram-post-image">
+              <div class="instagram-placeholder-gradient" id="instagram-placeholder-card">
+                <div class="instagram-placeholder-content">
+                  <div class="instagram-placeholder-wordmark">Content Analyzer</div>
+                  <div class="instagram-placeholder-score-badge">Engagement Score: <span id="instagram-score-number">--</span></div>
+                </div>
+              </div>
+              <img class="mockup-image" id="instagram-preview-img" src="" alt="Uploaded media preview" style="display: none;" />
+            </div>
+
+            <div class="mockup-actions instagram-actions-bar">
+              <div class="instagram-left-actions">
+                <span>❤️</span>
+                <span>💬</span>
+                <span>📤</span>
+              </div>
+              <span>🔖</span>
+            </div>
+            <div class="mockup-body instagram-caption">
+              <span class="mockup-name">your_handle</span>
+              <span id="instagram-preview-body"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <div class="notes-grid notes-grid--three">

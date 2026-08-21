@@ -157,6 +157,17 @@ class AnalysisTests(unittest.TestCase):
         self.assertNotEqual(a["engagement_score"], b["engagement_score"])
         self.assertNotEqual(a["rewrite"], b["rewrite"])
 
+    def test_heuristic_tone_preference_professional(self):
+        text = "This is a simple post about learning coding."
+        res = run_heuristic_analysis(text, tone_preference="professional")
+        self.assertIn("Regarding the growth and impact", res["rewrite"])
+
+    def test_heuristic_tone_preference_hype(self):
+        text = "This is a simple post about learning coding."
+        res = run_heuristic_analysis(text, tone_preference="hype")
+        self.assertIn("Huge shift happening", res["rewrite"])
+        self.assertIn("🚀", res["rewrite"])
+
 
 # ---------------------------------------------------------------------------
 # Flask endpoint tests
@@ -202,6 +213,15 @@ class AppEndpointTests(unittest.TestCase):
 
     def test_analyze_endpoint(self):
         resp = self.client.post("/api/analyze", json={"text": "A short test caption about running."})
+        self.assertEqual(resp.status_code, 200)
+        body = resp.get_json()
+        self.assertIn("engagement_score", body)
+
+    def test_analyze_endpoint_with_tone(self):
+        resp = self.client.post(
+            "/api/analyze",
+            json={"text": "A short test caption about running.", "tone": "witty"}
+        )
         self.assertEqual(resp.status_code, 200)
         body = resp.get_json()
         self.assertIn("engagement_score", body)

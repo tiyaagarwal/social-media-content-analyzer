@@ -46,6 +46,9 @@ ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_MODEL = os.environ.get("ANALYSIS_MODEL", "claude-sonnet-5")
 
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+
 STOPWORDS = {
     "the", "a", "an", "and", "or", "but", "if", "then", "so", "to", "of",
     "in", "on", "for", "with", "at", "by", "from", "up", "about", "into",
@@ -250,7 +253,7 @@ def _length_score(word_count: int) -> tuple[int, str]:
     return 5, "quite long for most feeds - readers may drop off"
 
 
-def run_heuristic_analysis(text: str) -> dict:
+def run_heuristic_analysis(text: str, tone_preference: str | None = None) -> dict:
     text = text.strip()
     if not text:
         raise AnalysisError("There is no text to analyze.")
@@ -326,7 +329,7 @@ def run_heuristic_analysis(text: str) -> dict:
     hashtags = existing_hashtags[:8] if existing_hashtags else [f"#{kw}" for kw in keywords[:5]]
     hooks = _generate_hooks(sentences[0] if sentences else "", keywords, text)
     ctas = _generate_ctas(tone, has_cta)
-    rewrite = _generate_rewrite(text, keywords, has_cta, emoji_count, hook_score)
+    rewrite = _generate_rewrite(text, keywords, has_cta, emoji_count, hook_score, tone_preference)
 
     summary = (
         f"{word_count}-word post, {tone.lower()} in tone, currently scoring "
@@ -403,7 +406,7 @@ def _generate_ctas(tone: str, has_cta: bool) -> list[str]:
 
 
 def _generate_rewrite(
-    text: str, keywords: list[str], has_cta: bool, emoji_count: int, hook_score: int
+    text: str, keywords: list[str], has_cta: bool, emoji_count: int, hook_score: int, tone_preference: str | None = None
 ) -> str:
     """Build an improved version without destructively reflowing the
     original structure (so numbered lists / line breaks the author already
@@ -413,23 +416,80 @@ def _generate_rewrite(
 
     lines: list[str] = []
 
-    if hook_score < 15 and topic:
-        lines.append(f"Here's what most people get wrong about {topic}:")
+    if tone_preference == "professional":
+        if hook_score < 15 and topic:
+            lines.append(f"Regarding the growth and impact of {topic}:")
+            lines.append("")
+        lines.append(body)
+        if not has_cta:
+            lines.append("")
+            lines.append("For further insights and discussion, feel free to connect or share your perspective below.")
+        if keywords and not re.search(r"#\w+", text):
+            lines.append("")
+            lines.append(" ".join(f"#{kw.capitalize()}" for kw in keywords[:4]))
+            
+    elif tone_preference == "witty":
+        if hook_score < 15 and topic:
+            lines.append(f"Let's be honest: most advice about {topic} is pretty boring. Here is the actual reality:")
+            lines.append("")
+        lines.append(body)
+        if not has_cta:
+            lines.append("")
+            lines.append("Drop a comment if you've been here, or save this before you forget it.")
+        if keywords and not re.search(r"#\w+", text):
+            lines.append("")
+            lines.append(" ".join(f"#{kw}" for kw in keywords[:5]))
+            
+    elif tone_preference == "educational":
+        if hook_score < 15 and topic:
+            lines.append(f"Understanding {topic} is key to navigating this space. Here is what you need to know:")
+            lines.append("")
+        lines.append(body)
+        if not has_cta:
+            lines.append("")
+            lines.append("Save this post for reference next time you're working on this.")
+        if keywords and not re.search(r"#\w+", text):
+            lines.append("")
+            lines.append(" ".join(f"#{kw}" for kw in keywords[:5]))
+            
+    elif tone_preference == "hype":
+        if hook_score < 15 and topic:
+            lines.append(f"🚨 Huge shift happening in {topic} right now! Here is the breakdown:")
+            lines.append("")
+        lines.append(body)
         lines.append("")
-
-    lines.append(body)
-
-    if emoji_count == 0:
-        lines.append("")
-        lines.append("\u2728")
-
-    if not has_cta:
-        lines.append("")
-        lines.append("Save this if it was useful, and share it with someone who needs it.")
-
-    if keywords and not re.search(r"#\w+", text):
-        lines.append("")
-        lines.append(" ".join(f"#{kw}" for kw in keywords[:5]))
+        lines.append("✨ Check the link in bio to get started right now! 🚀")
+        if keywords and not re.search(r"#\w+", text):
+            lines.append("")
+            lines.append(" ".join(f"#{kw.upper()}" for kw in keywords[:5]))
+            
+    elif tone_preference == "short":
+        sentences = _sentences(text)
+        short_body = sentences[0] if sentences else body
+        if len(sentences) > 1:
+            short_body += " " + sentences[1]
+        lines.append(short_body)
+        if not has_cta:
+            lines.append("")
+            lines.append("Agree or disagree? Let me know.")
+        if keywords and not re.search(r"#\w+", text):
+            lines.append("")
+            lines.append(" ".join(f"#{kw}" for kw in keywords[:3]))
+            
+    else:
+        if hook_score < 15 and topic:
+            lines.append(f"Here's what most people get wrong about {topic}:")
+            lines.append("")
+        lines.append(body)
+        if emoji_count == 0:
+            lines.append("")
+            lines.append("\u2728")
+        if not has_cta:
+            lines.append("")
+            lines.append("Save this if it was useful, and share it with someone who needs it.")
+        if keywords and not re.search(r"#\w+", text):
+            lines.append("")
+            lines.append(" ".join(f"#{kw}" for kw in keywords[:5]))
 
     return "\n".join(lines).strip()
 
@@ -459,11 +519,26 @@ with exactly these keys:
 Be specific to the actual content given - do not return generic advice."""
 
 
-def run_ai_analysis(text: str, api_key: str) -> dict:
+def run_ai_analysis(text: str, api_key: str, tone_preference: str | None = None) -> dict:
+    model = os.environ.get("ANALYSIS_MODEL", "").strip() or DEFAULT_MODEL
+    # Normalize model override if it was meant for Gemini but we fell back or vice versa
+    if "claude" not in model.lower() and model == DEFAULT_MODEL:
+        model = "claude-3-5-sonnet-20241022"
+    elif not model or "claude" not in model.lower():
+        model = "claude-3-5-sonnet-20241022"
+
+    sys_prompt = _AI_SYSTEM_PROMPT
+    if tone_preference:
+        sys_prompt += (
+            f"\n\nCRITICAL: The user has requested the tone of the rewrite to be '{tone_preference}'. "
+            f"Tailor the rewritten draft ('rewrite' key), alternative hooks ('hooks' key), "
+            f"and suggestions to match this requested tone."
+        )
+
     payload = {
-        "model": DEFAULT_MODEL,
+        "model": model,
         "max_tokens": 1500,
-        "system": _AI_SYSTEM_PROMPT,
+        "system": sys_prompt,
         "messages": [{"role": "user", "content": text[:8000]}],
     }
     headers = {
@@ -492,18 +567,165 @@ def run_ai_analysis(text: str, api_key: str) -> dict:
     return parsed
 
 
+def run_gemini_analysis(text: str, api_key: str, tone_preference: str | None = None) -> dict:
+    model = os.environ.get("ANALYSIS_MODEL", "").strip()
+    if not model or "gemini" not in model.lower():
+        model = DEFAULT_GEMINI_MODEL
+    url = GEMINI_API_URL.format(model=model) + f"?key={api_key}"
+
+    sys_instruction = (
+        "You are an expert social media content strategist. You will be given the raw text "
+        "of a social media post (possibly extracted via OCR, so tolerate minor artifacts). "
+        "Analyze it and return a structured JSON response matching the schema. "
+    )
+    if tone_preference:
+        sys_instruction += (
+            f"CRITICAL: The user has requested the tone of the rewrite to be '{tone_preference}'. "
+            f"Tailor the rewritten draft ('rewrite' key), alternative hooks ('hooks' key), "
+            f"and suggestions to match this requested tone."
+        )
+
+    schema = {
+        "type": "OBJECT",
+        "properties": {
+            "engagement_score": {
+                "type": "INTEGER",
+                "description": "An overall engagement quality score from 1 to 100."
+            },
+            "tone": {
+                "type": "STRING",
+                "description": "The detected tone of the original post."
+            },
+            "readability": {
+                "type": "OBJECT",
+                "properties": {
+                    "label": {
+                        "type": "STRING",
+                        "description": "Readability category: e.g. Easy to read, Difficult to read."
+                    },
+                    "notes": {
+                        "type": "STRING",
+                        "description": "A very brief note about sentence/word length or structure."
+                    }
+                },
+                "required": ["label", "notes"]
+            },
+            "strengths": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "2 to 5 specific strengths of the post."
+            },
+            "improvements": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "2 to 5 specific things to improve."
+            },
+            "rewrite": {
+                "type": "STRING",
+                "description": "An improved version of the post. Apply the requested tone preference if specified. Use \\n for line breaks."
+            },
+            "hooks": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "3 alternative scroll-stopping opening lines matching the requested tone preference."
+            },
+            "cta": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "2 to 3 suggested calls to action matching the requested tone preference."
+            },
+            "hashtags": {
+                "type": "ARRAY",
+                "items": {"type": "STRING"},
+                "description": "3 to 8 relevant hashtags (each starting with '#')."
+            },
+            "summary": {
+                "type": "STRING",
+                "description": "One sentence summary of the post's current state."
+            }
+        },
+        "required": [
+            "engagement_score",
+            "tone",
+            "readability",
+            "strengths",
+            "improvements",
+            "rewrite",
+            "hooks",
+            "cta",
+            "hashtags",
+            "summary"
+        ]
+    }
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": text[:8000]}
+                ]
+            }
+        ],
+        "systemInstruction": {
+            "parts": [
+                {"text": sys_instruction}
+            ]
+        },
+        "generationConfig": {
+            "responseMimeType": "application/json",
+            "responseSchema": schema
+        }
+    }
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        raise AnalysisError(f"Gemini analysis request failed: {exc}") from exc
+
+    try:
+        data = resp.json()
+        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+        parsed = json.loads(raw_text)
+    except (KeyError, IndexError, ValueError, json.JSONDecodeError) as exc:
+        raise AnalysisError(f"Failed to parse Gemini response: {exc}") from exc
+
+    parsed["source"] = "gemini"
+    return parsed
+
+
 # --------------------------------------------------------------------------
 # Public entry point
 # --------------------------------------------------------------------------
 
-def analyze(text: str) -> dict:
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if api_key:
+def analyze(text: str, tone_preference: str | None = None) -> dict:
+    gemini_key = (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+
+    if gemini_key:
         try:
-            return run_ai_analysis(text, api_key)
+            return run_gemini_analysis(text, gemini_key, tone_preference)
         except AnalysisError:
-            # Fall back to the heuristic engine rather than failing the request.
-            result = run_heuristic_analysis(text)
+            # Fall back to Anthropic if configured, else heuristics
+            if anthropic_key:
+                try:
+                    return run_ai_analysis(text, anthropic_key, tone_preference)
+                except AnalysisError:
+                    pass
+            result = run_heuristic_analysis(text, tone_preference)
             result["source"] = "heuristic-fallback"
             return result
-    return run_heuristic_analysis(text)
+
+    if anthropic_key:
+        try:
+            return run_ai_analysis(text, anthropic_key, tone_preference)
+        except AnalysisError:
+            result = run_heuristic_analysis(text, tone_preference)
+            result["source"] = "heuristic-fallback"
+            return result
+
+    return run_heuristic_analysis(text, tone_preference)

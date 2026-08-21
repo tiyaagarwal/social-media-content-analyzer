@@ -36,7 +36,15 @@ def index():
 
 @app.route("/api/health")
 def health():
-    return jsonify({"status": "ok", "ai_configured": bool(os.environ.get("ANTHROPIC_API_KEY"))})
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    ai_configured = bool(gemini_key or anthropic_key)
+    provider = "gemini" if gemini_key else ("anthropic" if anthropic_key else "none")
+    return jsonify({
+        "status": "ok",
+        "ai_configured": ai_configured,
+        "provider": provider
+    })
 
 
 @app.route("/api/extract", methods=["POST"])
@@ -79,6 +87,7 @@ def api_extract():
 def api_analyze():
     payload = request.get_json(silent=True) or {}
     text = (payload.get("text") or "").strip()
+    tone = (payload.get("tone") or "").strip() or None
 
     if not text:
         return jsonify({"error": "No text was provided to analyze."}), 400
@@ -86,7 +95,7 @@ def api_analyze():
         return jsonify({"error": "Text is too long to analyze (20,000 character limit)."}), 400
 
     try:
-        result = analyze(text)
+        result = analyze(text, tone_preference=tone)
     except AnalysisError as exc:
         return jsonify({"error": str(exc)}), 422
     except Exception as exc:  # noqa: BLE001
