@@ -44,7 +44,8 @@ ANALYSIS_KEYS = [
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
-DEFAULT_MODEL = os.environ.get("ANALYSIS_MODEL", "claude-sonnet-5")
+FALLBACK_CLAUDE_MODEL = "claude-sonnet-5"
+DEFAULT_MODEL = os.environ.get("ANALYSIS_MODEL", "").strip() or FALLBACK_CLAUDE_MODEL
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
@@ -520,12 +521,11 @@ Be specific to the actual content given - do not return generic advice."""
 
 
 def run_ai_analysis(text: str, api_key: str, tone_preference: str | None = None) -> dict:
-    model = os.environ.get("ANALYSIS_MODEL", "").strip() or DEFAULT_MODEL
-    # Normalize model override if it was meant for Gemini but we fell back or vice versa
-    if "claude" not in model.lower() and model == DEFAULT_MODEL:
-        model = "claude-3-5-sonnet-20241022"
-    elif not model or "claude" not in model.lower():
-        model = "claude-3-5-sonnet-20241022"
+    model = DEFAULT_MODEL
+    # ANALYSIS_MODEL may be set for the Gemini path (e.g. when Gemini failed and we
+    # fell back to Claude) - ignore it here rather than send it to the Anthropic API.
+    if "claude" not in model.lower():
+        model = FALLBACK_CLAUDE_MODEL
 
     sys_prompt = _AI_SYSTEM_PROMPT
     if tone_preference:
