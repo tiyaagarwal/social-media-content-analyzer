@@ -181,7 +181,6 @@ def _emoji_count(text: str) -> int:
 
 
 def _detect_tone(text: str, words: list[str]) -> str:
-    lowered = text.lower()
     exclaims = text.count("!")
     questions = text.count("?")
     pos = sum(1 for w in words if w.lower() in POSITIVE_WORDS)
