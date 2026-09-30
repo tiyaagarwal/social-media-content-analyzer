@@ -93,10 +93,11 @@ python3 app.py                  # serves on http://localhost:5000
 ## Running tests
 
 ```bash
+pip install -r requirements-dev.txt
 python3 -m unittest discover -s tests -v
 ```
 
-The suite (20 tests) generates its own PDF/image fixtures on the fly (via `reportlab`/`Pillow`/`img2pdf`) and covers: text-layer PDF extraction, OCR fallback for scanned PDFs, direct image OCR, error handling for unsupported/corrupted/empty files, the analysis engine's scoring and rewrite logic, and all three Flask endpoints.
+The suite (23 tests) generates its own PDF/image fixtures on the fly (via `reportlab`/`Pillow`/`img2pdf`) and covers: text-layer PDF extraction, OCR fallback for scanned PDFs, direct image OCR, error handling for unsupported/corrupted/empty files, the analysis engine's scoring and rewrite logic, and all three Flask endpoints. `reportlab` and `img2pdf` are only needed to build these fixtures, so they live in `requirements-dev.txt` rather than the app's own `requirements.txt`.
 
 ## Deployment
 
