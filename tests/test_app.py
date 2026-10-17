@@ -14,6 +14,7 @@ import io
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -21,6 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
+from analyzer import extraction
 from analyzer.analysis import run_heuristic_analysis
 from analyzer.extraction import ExtractionError, extract
 from app import app
@@ -113,6 +115,64 @@ class ExtractionTests(unittest.TestCase):
     def test_corrupted_image_raises(self):
         with self.assertRaises(ExtractionError):
             extract(b"not a real image", "broken.png", "image/png")
+
+
+class ExtractionLimitTests(unittest.TestCase):
+    """One upload must not be able to stall a worker for minutes or exhaust its memory."""
+
+    def test_long_text_pdf_reads_only_the_first_pages(self):
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf, pagesize=letter)
+        for n in range(1, extraction.MAX_PAGES + 3):
+            c.drawString(72, 720, f"This is the caption text on page number {n}.")
+            c.showPage()
+        c.save()
+
+        result = extract(buf.getvalue(), "long.pdf", "application/pdf")
+        self.assertEqual(result.method, "pdf-text")
+        self.assertEqual(result.page_count, extraction.MAX_PAGES + 2)
+        self.assertIn(f"page number {extraction.MAX_PAGES}.", result.text)
+        self.assertNotIn(f"page number {extraction.MAX_PAGES + 1}.", result.text)
+        self.assertTrue(any("first 10 of 12 pages" in w for w in result.warnings))
+
+    def test_scanned_pdf_ocrs_only_the_first_pages(self):
+        import img2pdf
+
+        page = make_text_image(SAMPLE_LINES)
+        data = img2pdf.convert([page] * (extraction.MAX_OCR_PAGES + 2))
+        with patch.object(extraction.pytesseract, "image_to_string", return_value="coffee") as ocr:
+            result = extract(data, "scanned.pdf", "application/pdf")
+        self.assertEqual(ocr.call_count, extraction.MAX_OCR_PAGES)
+        self.assertEqual(result.method, "pdf-ocr")
+        self.assertTrue(any("first 3 of 5 pages" in w for w in result.warnings))
+
+    def test_huge_scanned_page_is_rendered_at_bounded_size(self):
+        import img2pdf
+
+        # 200in x 200in page: at the default 2.5x scale this would be a 36000px-square bitmap.
+        layout = img2pdf.get_layout_fun((img2pdf.in_to_pt(200), img2pdf.in_to_pt(200)))
+        data = img2pdf.convert(make_text_image(SAMPLE_LINES), layout_fun=layout)
+        with patch.object(extraction.pytesseract, "image_to_string", return_value="coffee") as ocr:
+            extract(data, "poster.pdf", "application/pdf")
+        image = ocr.call_args.args[0]
+        self.assertLessEqual(max(image.size), extraction.MAX_OCR_SIDE_PX)
+
+    def test_oversized_image_is_rejected_before_decoding(self):
+        data = make_text_image(SAMPLE_LINES)  # 900 x 180
+        with patch.object(extraction, "MAX_IMAGE_PIXELS", 900 * 180 - 1), \
+                patch.object(extraction.Image.Image, "load") as load:
+            with self.assertRaises(ExtractionError) as ctx:
+                extract(data, "big.png", "image/png")
+        self.assertIn("too large", str(ctx.exception))
+        load.assert_not_called()
+
+    def test_large_image_is_downscaled_for_ocr(self):
+        img = Image.new("RGB", (extraction.MAX_OCR_SIDE_PX * 2, 400), color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        with patch.object(extraction.pytesseract, "image_to_string", return_value="coffee") as ocr:
+            extract(buf.getvalue(), "wide.png", "image/png")
+        self.assertEqual(ocr.call_args.args[0].width, extraction.MAX_OCR_SIDE_PX)
 
 
 # ---------------------------------------------------------------------------

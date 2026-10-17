@@ -35,6 +35,16 @@ MIN_CHARS_PER_PAGE = 15
 # Render scale used when rasterising PDF pages for OCR (2.5 ~= 180 DPI).
 OCR_RENDER_SCALE = 2.5
 
+# Work limits. Extraction runs inside a sync gunicorn worker with a 30s
+# timeout, and OCR takes seconds per page, so an unbounded page count or
+# page size lets one upload (even a tiny PDF with thousands of blank or
+# poster-sized pages) stall a worker until it is killed or runs out of memory.
+# A social media post fits comfortably within these.
+MAX_PAGES = 10            # pages read from a PDF's text layer
+MAX_OCR_PAGES = 3         # pages rasterised and OCR'd from a scanned PDF
+MAX_OCR_SIDE_PX = 3000    # longest side of any image handed to Tesseract
+MAX_IMAGE_PIXELS = 50_000_000  # reject larger images before decoding them
+
 SUPPORTED_IMAGE_TYPES = {"png", "jpg", "jpeg", "webp", "bmp", "tiff"}
 
 
@@ -75,11 +85,26 @@ def _clean_page_text(raw: str) -> str:
     return "\n".join(cleaned).strip()
 
 
+def _fit_for_ocr(image: Image.Image) -> Image.Image:
+    """Downscale so the longest side is at most MAX_OCR_SIDE_PX."""
+    if max(image.size) > MAX_OCR_SIDE_PX:
+        image = image.copy()
+        image.thumbnail((MAX_OCR_SIDE_PX, MAX_OCR_SIDE_PX), Image.LANCZOS)
+    return image
+
+
+def _pages_skipped_warning(processed: int, total: int) -> str:
+    return (
+        f"Only the first {processed} of {total} pages were processed. "
+        "Upload just the page(s) with your post for a complete result."
+    )
+
+
 def _extract_pdf_text_layer(data: bytes) -> tuple[str, int]:
     pages_text: list[str] = []
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         page_count = len(pdf.pages)
-        for page in pdf.pages:
+        for page in pdf.pages[:MAX_PAGES]:
             raw = page.extract_text(x_tolerance=1.5, y_tolerance=3) or ""
             pages_text.append(_clean_page_text(raw))
     return "\n\n".join(p for p in pages_text if p), page_count
@@ -90,9 +115,11 @@ def _ocr_pdf(data: bytes) -> tuple[str, int]:
     pdf = pdfium.PdfDocument(data)
     try:
         page_count = len(pdf)
-        for i in range(page_count):
+        for i in range(min(page_count, MAX_OCR_PAGES)):
             page = pdf[i]
-            bitmap = page.render(scale=OCR_RENDER_SCALE)
+            # Cap the scale so a huge page can't produce a gigapixel bitmap.
+            scale = min(OCR_RENDER_SCALE, MAX_OCR_SIDE_PX / max(*page.get_size(), 1))
+            bitmap = page.render(scale=scale)
             image = bitmap.to_pil()
             text = pytesseract.image_to_string(image)
             pages_text.append(_clean_page_text(text))
@@ -111,9 +138,13 @@ def extract_from_pdf(data: bytes) -> ExtractionResult:
     except Exception as exc:  # noqa: BLE001 - surface as extraction error
         raise ExtractionError(f"Could not read this PDF ({exc}).") from exc
 
-    avg_chars_per_page = len(text.strip()) / max(page_count, 1)
+    pages_read = min(page_count, MAX_PAGES)
+    avg_chars_per_page = len(text.strip()) / max(pages_read, 1)
     if avg_chars_per_page >= MIN_CHARS_PER_PAGE:
-        return ExtractionResult(text=text, method="pdf-text", page_count=page_count).finalize()
+        result = ExtractionResult(text=text, method="pdf-text", page_count=page_count)
+        if page_count > pages_read:
+            result.warnings.append(_pages_skipped_warning(pages_read, page_count))
+        return result.finalize()
 
     # Likely a scanned PDF with no usable embedded text -> OCR fallback.
     try:
@@ -134,6 +165,8 @@ def extract_from_pdf(data: bytes) -> ExtractionResult:
         "This PDF had no embedded text layer, so text was recovered with OCR. "
         "Double-check the result for scanning artifacts."
     )
+    if page_count > MAX_OCR_PAGES:
+        result.warnings.append(_pages_skipped_warning(MAX_OCR_PAGES, page_count))
     return result.finalize()
 
 
@@ -144,6 +177,18 @@ def extract_from_image(data: bytes, filename: str = "") -> ExtractionResult:
 
     try:
         image = Image.open(io.BytesIO(data))
+    except Exception as exc:  # noqa: BLE001
+        raise ExtractionError(f"Could not open this image ({exc}).") from exc
+
+    # Image.open only reads the header, so this check runs before a small,
+    # highly compressed file can expand into gigabytes of pixels.
+    if image.width * image.height > MAX_IMAGE_PIXELS:
+        raise ExtractionError(
+            f"This image is too large to process ({image.width}x{image.height} pixels). "
+            "Resize it or take a regular screenshot and try again."
+        )
+
+    try:
         image.load()
     except Exception as exc:  # noqa: BLE001
         raise ExtractionError(f"Could not open this image ({exc}).") from exc
@@ -156,6 +201,7 @@ def extract_from_image(data: bytes, filename: str = "") -> ExtractionResult:
         scale = 1000 / max(image.size)
         new_size = (int(image.width * scale), int(image.height * scale))
         image = image.resize(new_size, Image.LANCZOS)
+    image = _fit_for_ocr(image)
 
     try:
         text = pytesseract.image_to_string(image)

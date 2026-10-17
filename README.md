@@ -8,7 +8,7 @@ Upload → Extracting → Extracted text preview → Analyze → Editorial notes
 
 ## Features
 
-- **Upload** — drag-and-drop or file picker, for PDF, PNG, JPG, JPEG, WEBP, BMP, and TIFF (up to 15 MB), with inline validation for unsupported types and oversized files.
+- **Upload** — drag-and-drop or file picker, for PDF, PNG, JPG, JPEG, WEBP, BMP, and TIFF (up to 15 MB), with inline validation for unsupported types and oversized files. To keep one upload from stalling the server, only the first 10 pages of a PDF are read (3 pages when a scanned PDF needs OCR), and images over 50 megapixels are rejected; the response includes a warning when pages are skipped.
 - **Text extraction**
   - PDFs are read via their embedded text layer, preserving line/paragraph structure.
   - If a PDF has no usable text layer (i.e. it's a scan saved as a PDF), each page is rasterized and run through OCR automatically — no separate "is this scanned?" step for the user.
