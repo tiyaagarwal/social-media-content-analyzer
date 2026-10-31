@@ -59,7 +59,7 @@ def api_extract():
     if not _allowed_filename(file.filename):
         ext = file.filename.rsplit(".", 1)[-1].upper() if "." in file.filename else "unknown"
         return jsonify({
-            "error": f"Unsupported file type '.{ext}'. Upload a PDF, PNG, JPG, or JPEG file."
+            "error": f"Unsupported file type '.{ext}'. Upload a PDF, PNG, JPG, JPEG, WEBP, BMP, or TIFF file."
         }), 400
 
     data = file.read()
