@@ -2,7 +2,7 @@ services:
   - type: web
     name: social-media-content-analyzer
     runtime: python
-    buildCommand: pip install -r requirements.txt && apt-get install -y tesseract-ocr
+    buildCommand: apt-get update && apt-get install -y tesseract-ocr && pip install -r requirements.txt
     startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT app:app
     envVars:
       - key: ANTHROPIC_API_KEY
